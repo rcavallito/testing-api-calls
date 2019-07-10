@@ -59,4 +59,11 @@ class CollegeLookUpViewController: UIViewController {
     
     }
     
+    @IBAction func goBackToHomeScreen(_ sender: Any) {
+        performSegue(withIdentifier: "goBackToHomeScreen", sender: self)
+    }
+    
+    
+    
+    
 }

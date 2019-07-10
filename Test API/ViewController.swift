@@ -10,82 +10,97 @@ import UIKit
 import Alamofire
 import SwiftyJSON
 
-class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDelegate {
-
-    @IBOutlet weak var collegePicker: UIPickerView!
-    @IBOutlet weak var acceptanceRateLabel: UILabel!
+class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
     
-    let apiKey = "&api_key=rH7C2p4T9zTOvjctQOiqvcLiz1CVL21fRmonNiv2"
-    let baseURL = "https://api.data.gov/ed/collegescorecard/v1/schools?id="
-    let collegeArray = ["Boston College", "Texas A&M", "Duke University", "University of Texas", "New York University", "Fordham University", "University of Southern California", "University of Oregon", "University of Alabama", "University of Florida", "University of Virginia"]
-    let collegeIdArray = ["164924", "228723", "198419", "228778", "193900", "191241", "123961", "209551", "100751", "134130", "234076"]
+    //For the TableViews we add "UITableViewDelegate" and "UITableViewDataSource" and then we need the following code based on this video: https://www.youtube.com/watch?v=fFpMiSsynXM
+    @IBOutlet weak var testingTableJSON: UITableView!
+    
+    var collegeList = ["College 1", "College 2", "College 3", "College 4"]
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int{
+        return(collegeList.count)
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell{
+        let cell = UITableViewCell(style: UITableViewCell.CellStyle.default, reuseIdentifier: "testCell")
+        cell.textLabel?.text = collegeList[indexPath.row]
+        return(cell)
+    }
+    
+    
+    //Original part of the code where a function is run to get data and display a manually determined piece of it in the Name of College and Acceptance Rate labels.
+    @IBOutlet weak var acceptanceRateLabel: UILabel!
+    @IBOutlet weak var nameOfCollege: UILabel!
+    
+    let apiKey = "pzTiQAuLWx613F6yeC9Kk30q7Yn0g1tgpJdARPhM"
+    let baseURL = "https://api.data.gov/ed/collegescorecard/v1/schools?"
     var finalURL = ""
     var collegeSelected = ""
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        collegePicker.delegate = self
-        collegePicker.dataSource = self
-        
+        getCollegeLists(name: "CUNY Queens College")
+   
     }
     
-    //MARK: UIPickerView delegate methods are here
-    
-    func numberOfComponents(in pickerView: UIPickerView) -> Int {
-        return 1
-    }
-    
-    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
-        return collegeArray.count
-    }
-    
-    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
-        return collegeArray[row]
-    }
-    
-    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
-        print(collegeArray[row])
-        
-        finalURL = baseURL + collegeIdArray[row] + apiKey
-        collegeSelected = collegeIdArray[row]
-        print(finalURL)
-        
-        getCollegeAcceptanceRate(url: finalURL)
-        
-    }
-    
-    //MARK: Networking
+    func getCollegeLists(zipCode: String? = nil, distanceInMile: Int? = nil, schoolState: String? = nil, perPage: Int? = nil, name: String? = nil, ownership: Int? = nil, additionalFields: [String: String]? = ["_fields": "id,school.ownership,school.name,school.state,latest.admissions.admission_rate.overall"]) {
 
-        func getCollegeAcceptanceRate(url: String) {
-
+        var parameters = [
+            "api_key": apiKey
+        ]
+        if let zipCode = zipCode, !zipCode.isEmpty {
+            parameters["_zip"] = zipCode
+        }
+        if let distance = distanceInMile, distance > 0 {
+            parameters["_distance"] = "\(distance)mi"
+        }
+        if let state = schoolState, !state.isEmpty {
+            parameters["school.state"] = state
+        }
+        if let perPage = perPage, perPage > 0 {
+            parameters["_per_page"] = "\(perPage)"
+        }
+        if let name = name, !name.isEmpty {
+            parameters["school.name"] = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        }
+        if let ownership = ownership {
+            parameters["school.ownership"] = "\(ownership)"
+        }
+        if let additionalFields = additionalFields {
+            parameters.merge(additionalFields) { (_, current) in current }
+        }
+        
+        let url = baseURL + buildParameterString(parameters: parameters)
+        
         Alamofire.request(url, method: .get)
             .responseJSON { response in
                 if response.result.isSuccess {
-                    let acceptanceRateJSON : JSON = JSON(response.result.value!)
-
-                    self.updateAcceptanceRate(json: acceptanceRateJSON)
-
+                    let json = JSON(response.result.value!)
+                    self.processCollegeList(json: json)
                 } else {
                     print("Error: \(String(describing: response.result.error))")
                     self.acceptanceRateLabel.text = "Connection Issues"
                 }
         }
     }
-
+    
+    func buildParameterString(parameters: [String: String]) -> String {
+        var arrParameters = [String]()
+        for parameter in parameters {
+            arrParameters.append("\(parameter.key)=\(parameter.value)")
+        }
+        let parameterString = arrParameters.joined(separator: "&")
+        print(parameterString)
+        return parameterString
+    }
 
     //MARK: - JSON Parsing
-
-    func updateAcceptanceRate(json : JSON) {
-
-        if let acceptanceRateResult = json["results"][0]["latest"]["admissions"]["admission_rate"]["overall"].double {
-        acceptanceRateLabel.text = ("\(acceptanceRateResult * 100)%")
-        }
-
-        else {
-        acceptanceRateLabel.text = "Fail!"
-
-        }
+    func processCollegeList(json: JSON) {
+        print(">>>===== Start ========")
+        print(json)
+        print(">>>===== End ========")
+        
+        acceptanceRateLabel.text = json["results"][1]["latest.admissions.admission_rate.overall"].stringValue
+        nameOfCollege.text = json["results"][1]["school.name"].stringValue
     }
 }
-
